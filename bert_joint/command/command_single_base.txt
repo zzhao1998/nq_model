@@ -1,0 +1,24 @@
+这个部分旨在使用单答案模型预测多答案的结构 run_nq_multi_answer
+
+predict
+
+CUDA_VISIBLE_DEVICES=0 python2 -m run_nq_multi_answer \
+  --logtostderr \
+  --bert_config_file=bert_config.json \
+  --vocab_file=./data/vocab-nq.txt \
+  --predict_file=output.jsonl.gz \
+  --init_checkpoint=/home/zhangzihao/nq_model/bert_joint/bert_model_output/base_model/model.ckpt-82445 \
+  --do_predict \
+  --output_dir=./bert_model_output_fun/ \
+  --output_prediction_file=./prediction/output.prediction.json
+
+
+generate prediction
+
+python -m nq_eval \
+  --logtostderr \
+  --gold_path=/home/data/dataset/NaturalQuestions/v1.0/sample/nq-dev-sample.jsonl.gz \
+  --predictions_path=./prediction/nq-dev-sample.147445.prediction.json
+
+eval prediction
+

@@ -1,0 +1,222 @@
+prepare data all
+
+python -m prepare_nq_data \
+  --logtostderr \
+  --input_jsonl /home/data/dataset/NaturalQuestions/v1.0/train/*.gz \
+  --output_tfrecord ./data/nq-train.512length.tfrecord \
+  --max_seq_length=512 \
+  --include_unknowns=0.02 \
+  --vocab_file=data/vocab-nq.txt
+
+
+use data dir
+这样可以转换为一个文件
+python -m prepare_data_dir \
+--logtostderr \
+  --input_dir /home/data/dataset/NaturalQuestions/v1.0/train/ \
+  --output_tfrecord ./data/nq-train.full.512length.tfrecord \
+  --max_seq_length=512 \
+  --include_unknowns=0.02 \
+  --vocab_file=data/vocab-nq.txt
+
+
+prepare data sample
+python -m prepare_nq_data \
+  --logtostderr \
+  --input_jsonl /home/data/dataset/NaturalQuestions/v1.0/sample/nq-train-sample.jsonl.gz \
+  --output_tfrecord ./data/nq-train.tfrecord \
+  --vocab_file=data/vocab-nq.txt
+
+
+predict model
+
+CUDA_VISIBLE_DEVICES=2 python2 -m run_nq \
+  --logtostderr \
+  --bert_config_file=bert_config.json \
+  --vocab_file=vocab-nq.txt \
+  --predict_file=nq-dev-sample.jsonl \
+  --init_checkpoint=bert_joint.ckpt \
+  --do_predict \
+  --output_dir=zzh_output \
+   --output_prediction_file=zzh_output/prediction.json
+
+train model
+
+CUDA_VISIBLE_DEVICES=3 python2 -m run_nq \
+  --logtostderr \
+  --bert_config_file=./bert_config.json \
+  --vocab_file=./data/vocab-nq.txt \
+  --train_precomputed_file=./data/nq-train.tfrecords-00000-of-00001 \
+  --train_num_precomputed=494670 \
+  --learning_rate=1e-5 \
+  --num_train_epochs=2 \
+  --max_seq_length=512 \
+  --train_batch_size=6 \
+  --save_checkpoints_steps=5000 \
+  --init_checkpoint=./bert_base/bert_model.ckpt \
+  --do_train \
+  --output_dir=./bert_model_output_fun/
+
+epoch1 lr =3e-5
+epoch2 lr=1e-5
+
+seq_length vs batch
+BERT-Base	64	64
+...	128	32
+...	256	16
+...	320	14
+...	384	12
+...	512	6
+
+
+
+evaluate model on sample dev
+
+CUDA_VISIBLE_DEVICES=0 python2 -m run_nq \
+  --logtostderr \
+  --bert_config_file=bert_config.json \
+  --vocab_file=./data/vocab-nq.txt \
+  --predict_file=/home/data/dataset/NaturalQuestions/v1.0/sample/nq-dev-sample.jsonl.gz \
+  --init_checkpoint=./bert_model_output_epoch1/model.ckpt-147445 \
+  --do_predict \
+--output_dir=./bert_model_output_epoch1/ \
+--output_prediction_file=./prediction/nq-dev-sample.147445.prediction.json
+
+python -m nq_eval \
+  --logtostderr \
+  --gold_path=/home/data/dataset/NaturalQuestions/v1.0/sample/nq-dev-sample.jsonl.gz \
+  --predictions_path=./prediction/nq-dev-sample.147445.prediction.json
+
+evaluate model on complete dev
+
+CUDA_VISIBLE_DEVICES=0 python2 -m run_nq \
+  --logtostderr \
+  --bert_config_file=bert_config.json \
+  --vocab_file=./data/vocab-nq.txt \
+  --predict_file=/home/data/dataset/NaturalQuestions/v1.0/dev/nq-dev-00.jsonl.gz \
+  --init_checkpoint=./bert_model_output_epoch1/model.ckpt-164890 \
+  --do_predict \
+--output_dir=./bert_model_output_epoch1/ \
+--output_prediction_file=./prediction/nq-dev-00.164890.prediction.json
+
+python -m nq_eval \
+  --logtostderr \
+  --gold_path=/home/data/dataset/NaturalQuestions/v1.0/dev/nq-dev-00.jsonl.gz \
+  --predictions_path=./prediction/nq-dev-00.164890.prediction.json
+
+
+evaluate on multi task
+CUDA_VISIBLE_DEVICES=0 python2 -m run_nq \
+  --logtostderr \
+  --bert_config_file=bert_config.json \
+  --vocab_file=./data/vocab-nq.txt \
+  --predict_file=./multi_answers_data/multi_answers_nq-train-00.jsonl \
+  --init_checkpoint=./bert_model_output/model.ckpt-82445 \
+  --do_predict \
+--output_dir=./bert_model_output_epoch1/ \
+--output_prediction_file=./prediction/multi_answers_nq-train-00.prediction.json
+
+python -m nq_eval \
+  --logtostderr \
+  --gold_path=./multi_answers_data/multi_answers_nq-train-00.jsonl \
+  --predictions_path=./prediction/multi_answers_nq-train-00.prediction.json
+
+
+test
+
+prepare data
+
+python -m prepare_nq_data \
+  --logtostderr \
+  --input_jsonl /home/data/dataset/NaturalQuestions/v1.0/sample/nq-train-sample.jsonl.gz \
+  --output_tfrecord ./data/nq-train-sample.multi_answers_data.length512.tfrecord \
+  --max_seq_length=512 \
+  --include_unknowns=0.02 \
+  --vocab_file=data/vocab-nq.txt
+
+python -m prepare_nq_data \
+  --logtostderr \
+  --input_jsonl output.jsonl.gz \
+  --output_tfrecord ./data/output.multi_combinaton_data.length512.tfrecord \
+  --max_seq_length=512 \
+  --include_unknowns=0.02 \
+  --vocab_file=data/vocab-nq.txt
+  --is_multi_combination = True
+
+train 
+
+CUDA_VISIBLE_DEVICES=1 python2 -m run_nq_new \
+  --logtostderr \
+  --bert_config_file=./bert_config.json \
+  --vocab_file=./data/vocab-nq.txt \
+  --train_precomputed_file=./data/output.multi_combinaton_data.length512.tfrecord \
+  --train_num_precomputed=26 \
+  --learning_rate=1e-5 \
+  --num_train_epochs=50 \
+  --max_seq_length=512 \
+--train_batch_size=6 \
+  --save_checkpoints_steps=5000 \
+  --init_checkpoint=./bert_base/bert_model.ckpt \
+  --do_train \
+  --output_dir=./bert_model_output_epoch2/
+
+test
+
+CUDA_VISIBLE_DEVICES=3 python2 -m run_nq_new \
+  --logtostderr \
+  --bert_config_file=./bert_config.json \
+  --vocab_file=./data/vocab-nq.txt \
+  --train_precomputed_file=./data/output.multi_answers_data.length512.tfrecord \
+  --train_num_precomputed=5 \
+  --learning_rate=1e-5 \
+  --num_train_epochs=200 \
+  --max_seq_length=512 \
+--train_batch_size=5 \
+  --save_checkpoints_steps=5000 \
+  --init_checkpoint=./bert_base/bert_model.ckpt \
+  --do_train \
+  --output_dir=./bert_model_output_epoch2/
+
+predict
+
+
+
+eval
+
+
+
+
+
+
+
+
+
+
+multi_combinaton_data
+
+prepare_data:
+
+python -m prepare_nq_data \
+  --logtostderr \
+  --input_jsonl '/home/data/dataset/NaturalQuestions/v1.0/train/nq-train-4[5-9].jsonl.gz' \
+  --output_tfrecord ./data/combination_record/nq-train-45-49.tfrecord \
+  --max_seq_length=512 \
+  --include_unknowns=0.02 \
+  --vocab_file=data/vocab-nq.txt
+
+train
+
+CUDA_VISIBLE_DEVICES=2 python2 -m run_nq_new \
+  --logtostderr \
+  --bert_config_file=./bert_config.json \
+  --vocab_file=./data/vocab-nq.txt \
+  --train_precomputed_file=./data/combination_record/nq-train-45-49.tfrecord \
+  --train_num_precomputed=107766 \
+  --learning_rate=1e-5 \
+  --num_train_epochs=1 \
+  --max_seq_length=512 \
+  --train_batch_size=6 \
+  --save_checkpoints_steps=5000 \
+  --init_checkpoint=./bert_base/bert_model.ckpt \
+  --do_train \
+  --output_dir=./bert_model_output/model_no_combine_loss_basic 

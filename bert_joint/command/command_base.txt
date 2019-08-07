@@ -1,0 +1,45 @@
+这个是为基本模型 run_nq准备的训练命令
+
+1.生成训练数据
+
+python -m prepare_nq_data \
+  --logtostderr \
+  --input_jsonl '/home/data/dataset/NaturalQuestions/v1.0/train/*.gz' \
+  --output_tfrecord ./data/nq-train.512length.tfrecord \
+  --max_seq_length=512 \
+  --include_unknowns=0.02 \
+  --vocab_file=data/vocab-nq.txt
+
+2. 完整训练
+
+CUDA_VISIBLE_DEVICES= python2 -m run_nq \
+  --logtostderr \
+  --bert_config_file=./bert_config.json \
+  --vocab_file=./data/vocab-nq.txt \
+  --train_precomputed_file=./data/nq-train.tfrecords-00000-of-00001 \
+  --train_num_precomputed=494670 \
+  --learning_rate=1e-5 \
+  --num_train_epochs=2 \
+  --max_seq_length=512 \
+  --train_batch_size=6 \
+  --save_checkpoints_steps=5000 \
+  --init_checkpoint=./bert_base/bert_model.ckpt \
+  --do_train \
+  --output_dir=./bert_model_output_fun/
+
+3. 生成预测结果(sample)
+CUDA_VISIBLE_DEVICES=0 python2 -m run_nq \
+  --logtostderr \
+  --bert_config_file=bert_config.json \
+  --vocab_file=./data/vocab-nq.txt \
+  --predict_file=/home/data/dataset/NaturalQuestions/v1.0/sample/nq-dev-sample.jsonl.gz \
+  --init_checkpoint=/home/zhangzihao/nq_model/bert_joint/bert_model_output/base_model/model.ckpt-82445 \
+  --do_predict \
+  --output_dir=./bert_model_output_fun/ \
+  --output_prediction_file=./prediction/nq-dev-sample.82445.prediction.json
+
+4. 评判预测结果(sample)
+python -m nq_eval \
+  --logtostderr \
+  --gold_path=/home/data/dataset/NaturalQuestions/v1.0/sample/nq-train-sample.jsonl.gz \
+  --predictions_path=./prediction/nq-train-sample.82445.prediction.json

@@ -1,0 +1,31 @@
+
+prepare tfrecord
+
+python -m prepare_nq_data \
+  --logtostderr \
+  --input_jsonl '/home/zhangzihao/nq_model/bert_joint/data/orig_data/test1/1.jsonl' \
+  --output_tfrecord /home/zhangzihao/nq_model/bert_joint/data/test_tfrecord/1.tfrecord \
+  --max_seq_length=512 \
+  --include_unknowns=0.02 \
+  --vocab_file=data/vocab-nq.txt \
+  --is_multi_combination=False
+
+
+
+
+CUDA_VISIBLE_DEVICES=1 python -m run_nq_new \
+  --logtostderr \
+  --bert_config_file=./bert_config.json \
+  --vocab_file=./data/vocab-nq.txt \
+  --train_precomputed_file=/home/zhangzihao/nq_model/bert_joint/data/test_tfrecord \
+  --train_num_precomputed=42630 \
+  --learning_rate=1e-5 \
+  --num_train_epochs=2 \
+  --max_seq_length=512 \
+  --train_batch_size=6 \
+  --save_checkpoints_steps=5000 \
+  --init_checkpoint=./bert_base/bert_model.ckpt \
+  --do_train \
+  --output_dir=./bert_model_output/test \
+  --model_mode = 'basic' \
+  --loss_mode = 'basic'

@@ -1,0 +1,90 @@
+no_combination_data
+每个例子只生成一个实例的模型
+prepare_data:
+
+python -m prepare_nq_data \
+  --logtostderr \
+  --input_jsonl '/home/data/dataset/NaturalQuestions/v1.0/train/nq-train-4[5-9].jsonl.gz' \
+  --output_tfrecord ./data/no_combination_record/nq-train-45-49.tfrecord \
+  --max_seq_length=512 \
+  --include_unknowns=0.02 \
+  --vocab_file=data/vocab-nq.txt \
+  --is_multi_combination=False
+
+train
+loss_mode =basic
+CUDA_VISIBLE_DEVICES=3 python2 -m run_nq_new \
+  --logtostderr \
+  --bert_config_file=./bert_config.json \
+  --vocab_file=./data/vocab-nq.txt \
+  --train_precomputed_file=./data/no_combination_record \
+  --train_num_precomputed=42630 \
+  --learning_rate=1e-5 \
+  --num_train_epochs=1 \
+  --max_seq_length=512 \
+  --train_batch_size=6 \
+  --save_checkpoints_steps=5000 \
+  --init_checkpoint=./bert_base/bert_model.ckpt \
+  --do_train \
+  --output_dir=./bert_model_output/model_no_combine_loss_basic \
+  --model_mode = 'basic' \
+  --loss_mode = 'basic'
+
+loss_mode =advance
+CUDA_VISIBLE_DEVICES=0 python2 -m run_nq_new \
+  --logtostderr \
+  --bert_config_file=./bert_config.json \
+  --vocab_file=./data/vocab-nq.txt \
+  --train_precomputed_file=/home/zhangzihao/nq_model/bert_joint/data/no_combination_record \
+  --train_num_precomputed=42360 \
+  --learning_rate=1e-5 \
+  --num_train_epochs=2 \
+  --max_seq_length=512 \
+  --train_batch_size=6 \
+  --save_checkpoints_steps=5000 \
+  --init_checkpoint=./bert_base/bert_model.ckpt \
+  --do_train \
+  --output_dir=./bert_model_output/model_no_combination_loss_advance_epoch2 \
+  --model_mode='basic' \
+  --loss_mode='advance'
+
+
+gujunru
+loss_mode =basic
+CUDA_VISIBLE_DEVICES=2 python2 -m run_nq_new \
+  --logtostderr \
+  --bert_config_file=./bert_config.json \
+  --vocab_file=./data/vocab-nq.txt \
+  --train_precomputed_file=./data/combination_record \
+  --train_num_precomputed=42630 \
+  --learning_rate=1e-5 \
+  --num_train_epochs=1 \
+  --max_seq_length=512 \
+  --train_batch_size=4 \
+  --save_checkpoints_steps=5000 \
+  --init_checkpoint=./bert_base/bert_model.ckpt \
+  --do_train \
+  --output_dir=./bert_model_output/model_combination_loss_basic \
+  --model_mode='mask' \
+  --loss_mode='basic'
+
+
+
+
+
+predict 
+
+CUDA_VISIBLE_DEVICES=0 python2 -m run_nq \
+  --logtostderr \
+  --bert_config_file=bert_config.json \
+  --vocab_file=./data/vocab-nq.txt \
+  --predict_file=./multi_answers_data/multi_answers_nq-train-00.jsonl \
+  --init_checkpoint=./bert_model_output/model.ckpt-82445 \
+  --do_predict \
+  --output_dir=./bert_model_output_epoch1/ \
+  --output_prediction_file=./prediction/multi_answers_nq-train-00.prediction.json
+
+python -m nq_eval \
+  --logtostderr \
+  --gold_path=./multi_answers_data/multi_answers_nq-train-00.jsonl \
+  --predictions_path=./prediction/multi_answers_nq-train-00.prediction.json
