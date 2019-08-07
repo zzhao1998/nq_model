@@ -1,6 +1,7 @@
 *
 !/**/
 ##去除哪些路径
+dataset_config.py
 /dirignore1/
 /dirignore2/
 ##只包含哪些结尾的文件
