@@ -56,23 +56,40 @@ def compute_label_loss(logits, labels):
 #这个要求计算多个值
 # logits [batch_size,seq_length]
 # onehot_positions [batch_size,seq_length]
+
 def compute_position_extra_loss(logits,one_hot_positions):
+    # 归一化处理
+    logits = tf.nn.log_softmax(logits)
+
+
     CLS_p = logits[:,0]
-    print(logits.shape)
+    #print(logits.shape)
     batch_size = logits.shape[0]
     seq_length = logits.shape[1]
-    print(CLS_p.shape)
+    #print(CLS_p.shape)
     CLS_p = tf.reshape(CLS_p,[-1,1])
     CLS_p = tf.tile(CLS_p,[1,seq_length-1])
 
     onehot_positions = tf.cast(one_hot_positions,dtype=tf.float32)
     positive_logits = (logits * onehot_positions)[:,1:]
     negative_logits = (logits[:,1:]-positive_logits)
-    print(positive_logits.shape) 
-    print(negative_logits.shape)
+    #print(positive_logits.shape) 
+    #print(negative_logits.shape)
 
-    positive_loss = - tf.reduce_mean(tf.reduce_max(positive_logits-CLS_p,axis = -1)) 
-    negative_loss = - tf.reduce_mean(tf.reduce_max(CLS_p-negative_logits,axis = -1)) 
+    # hinge loss
+    marigin = 0.1 
+    #positive
+    # CLS_P + marigin < positive_logits
+    positive_H = tf.reduce_max(marigin+CLS_p - positive_logits,axis = -1) # 找到小于CLS+marigin 最多处的positive_logits 
+    positive_L = tf.nn.relu(positive_H)
+    positive_loss =  tf.reduce_mean(positive_L) 
+    #negative
+    # CLS_P - marigin > negative_logits
+    negative_H = tf.reduce_max(negative_logits+margin-CLS_p,axis = -1)
+    negative_L = tf.nn.relu(negative_H)
+    negative_loss =  tf.reduce_mean(negative_L) 
+    
+    
     return positive_loss+negative_loss
 
 
