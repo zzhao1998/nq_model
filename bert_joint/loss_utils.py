@@ -77,14 +77,14 @@ def compute_position_extra_loss(logits,one_hot_positions):
     #print(negative_logits.shape)
 
     # hinge loss
-    marigin = 0.1 
+    margin = 0.1 
     #positive
-    # CLS_P + marigin < positive_logits
-    positive_H = tf.reduce_max(marigin+CLS_p - positive_logits,axis = -1) # 找到小于CLS+marigin 最多处的positive_logits 
+    # CLS_P + margin < positive_logits
+    positive_H = tf.reduce_max(margin+CLS_p - positive_logits,axis = -1) # 找到小于CLS+margin 最多处的positive_logits 
     positive_L = tf.nn.relu(positive_H)
     positive_loss =  tf.reduce_mean(positive_L) 
     #negative
-    # CLS_P - marigin > negative_logits
+    # CLS_P - margin > negative_logits
     negative_H = tf.reduce_max(negative_logits+margin-CLS_p,axis = -1)
     negative_L = tf.nn.relu(negative_H)
     negative_loss =  tf.reduce_mean(negative_L) 
