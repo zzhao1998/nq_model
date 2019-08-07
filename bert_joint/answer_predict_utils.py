@@ -206,9 +206,9 @@ def get_prediction_basic(start_logits,end_logits,answer_type_logits,max_answer_l
     start_indexes = get_best_indexes(start_logits, n_best_size)
     end_indexes = get_best_indexes(end_logits, n_best_size)
     # 返回的prediction_record_list
-    print(start_logits)
-    print(end_logits)
-    print(answer_type_logits)
+    #print(start_logits)
+    #print(end_logits)
+    #print(answer_type_logits)
     prediction_record_list=[]
     for start_index in start_indexes:
       for end_index in end_indexes:
