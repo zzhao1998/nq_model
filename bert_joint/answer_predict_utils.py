@@ -19,7 +19,10 @@ from __future__ import print_function
 
 import tensorflow as tf
 
-tf.flags.DEFINE_string("predict_mode", "basic", "the type of predicting method")
+flags = tf.flags
+FLAGS = flags.FLAGS
+
+flags.DEFINE_string("predict_mode", "basic", "the type of predicting method")
 
 """
 class InputFeatures(object):
@@ -79,9 +82,10 @@ def compute_predictions(example):
   n_best_size = 10
   max_answer_length = 30
   answers = []
-  prediction_record_list = []
+  total_prediction_record_list = []
 
   for unique_id, result in example.results.iteritems():
+    # 每一个feature
     if unique_id not in example.features:
       raise ValueError("No feature found with unique_id:", unique_id)
     token_map = example.features[unique_id]["token_map"].int64_list.value
@@ -89,16 +93,12 @@ def compute_predictions(example):
     end_logits = result["end_logits"]
     answer_type_logits =  result["answer_type_logits"]
 
-    #get prediction
-    prediction_record_list.extend(get_prediction(start_logits,end_logits,answer_type_logits,max_answer_length,token_map,mode = "basic"))
+    
+    prediction_list=get_prediction(start_logits,end_logits,answer_type_logits,max_answer_length,token_map,mode = FLAGS.predict_mode)
+    
     # get best prediction
     def get_score(prediction_record):
       return prediction_record.score
-    # get best
-    sorted_prediction_list = sorted(prediction_record_list,key = get_score ,reverse=True)
-    best_prediction_record= [sorted_prediction_list[0]]
-
-    score = get_score(best_prediction_record[0])
     # get all score > 0
     def filter(prediction_record_list):
       ret = []
@@ -107,16 +107,16 @@ def compute_predictions(example):
           ret.append(prediction_record)
       return ret
     
-    best_prediction_record = filter(sorted_prediction_list)
+    #所有score>0均为合格预测
+
+    qualified_prediction_list = filter(prediction_list)
+
+    #将合格预测添加至总预测表中
+    total_prediction_record_list.extend(qualified_prediction_list)
+  # get sort 排序
+  sorted_prediction_list = sorted(total_prediction_record_list,key = get_score ,reverse=True)
     
-  #short_span = Span(start_span, end_span)
-  #long_span = Span(-1, -1)
-  #for c in example.candidates:
-    #start = short_span.start_token_idx
-    #end = short_span.end_token_idx
-    #if c["top_level"] and c["start_token"] <= start and c["end_token"] >= end:
-      #long_span = Span(c["start_token"], c["end_token"])
-      #break
+  
   def get_short_answers_output(prediction_record_list):
     # 这个用以获取输出结果
     short_answers_output = []
@@ -133,6 +133,9 @@ def compute_predictions(example):
       }
       short_answers_output.append(short_answer_record)
     return short_answers_output
+
+
+
   summary = ScoreSummary()
   summary.predicted_label = {
       "example_id": example.example_id,
@@ -142,9 +145,9 @@ def compute_predictions(example):
           "start_byte": -1,
           "end_byte": -1,
       },
-      "long_answer_score": score,
-      "short_answers": get_short_answers_output(best_prediction_record),
-      "short_answers_score": score,
+      "long_answer_score": 0,
+      "short_answers": get_short_answers_output(sorted_prediction_list),
+      "short_answers_score": 0,
       "yes_no_answer": "NONE"
   }
 
@@ -155,9 +158,11 @@ def compute_predictions(example):
 def get_prediction(start_logits,end_logits,answer_type_logits,max_answer_length,token_map,mode="basic"):
     if (mode == "basic"):
         return get_prediction_basic(start_logits,end_logits,answer_type_logits,max_answer_length,token_map)
-    else:
+    if (mode == "by_start"):
+        return get_prediction_by_start(start_logits,end_logits,answer_type_logits,max_answer_length,token_map)
+    #else:
         #greedy
-        return get_prediction_basic(start_logits,end_logits,answer_type_logits,max_answer_length,token_map)
+        #return get_prediction_basic(start_logits,end_logits,answer_type_logits,max_answer_length,token_map)
 
 
 """
@@ -241,3 +246,50 @@ def get_prediction_basic(start_logits,end_logits,answer_type_logits,max_answer_l
         prediction_record_list.append(prediction_record)
 
     return prediction_record_list
+
+
+
+
+
+
+def get_prediction_by_start(start_logits,end_logits,answer_type_logits,max_answer_length,token_map):
+  #这个的核心在于只根据start进行选取
+  # 如果start>CLS_p则视为答案，选择max_Answer_length以内的最大的end作为答案的end
+  prediction_record_list=[]
+  length = len(start_logits)
+  CLS_p = start_logits[0]
+  for i in range(length):
+    start_index = i
+    if(token_map[i] == -1):
+      continue
+    if(start_logits[i]>CLS_p):
+      print(token_map[i])
+      #进行选择最大的end
+      end = -1
+      end_p = -10000
+      for j in range(max_answer_length):
+        if(i+j>=length):
+          break
+        if(token_map[i+j] == -1):
+          continue
+        if(end_logits[i+j]>end_p):
+          end = i+j
+          end_p = end_logits[i+j]
+      if(end == -1):
+        continue
+      else:
+        end_index = end
+
+
+      score = start_logits[start_index]+end_logits[end_index] - start_logits[0] - end_logits[0]
+      # construct prediction_record
+      prediction_record = PredictionRecord()
+      prediction_record.span_start = token_map[start_index]
+      prediction_record.span_end = token_map[end_index]+1
+      prediction_record.answerable_p = start_logits[start_index]+end_logits[end_index]
+      prediction_record.unanswerable_p = start_logits[0]+end_logits[0]
+      prediction_record.score = score
+      prediction_record.answer_type_logits = answer_type_logits
+      prediction_record_list.append(prediction_record)
+      
+  return prediction_record_list
