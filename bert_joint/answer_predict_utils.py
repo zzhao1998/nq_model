@@ -68,6 +68,63 @@ class PredictionRecord(object):
     self.score = None
     self.answer_type_logits = None
 
+
+# 用于去重叠
+def eliminate_overlap(li):
+  def judge(a, b):
+    if (a.span_start < b.span_start or (a.span_start == b.span_start and a.span_end < b.span_end)):
+      return True
+    return False
+  length = len(li)
+  if length == 0:
+    return []
+  mx = 0
+  for i in range(length):
+    mx = max(mx, li[i].span_end)
+  erase = [0 for i in range(length)]
+  for i in range(length):
+    for j in range(length):
+      if i != j and not erase[j]:
+        if (li[j].span_start <= li[i].span_start and li[i].span_end <= li[j].span_end):
+          erase[i] = 1;
+
+  for c in range(length):
+    for i in range(1, length):
+      if judge(li[i], li[i - 1]):
+        li[i], li[i - 1] = li[i - 1], li[i]
+   
+  
+
+  f = [0.0 for i in range(length)]
+  g = [0 for i in range(length)]
+
+  a = 0
+
+  for i in range(length):
+    f[i] = li[i].score
+    g[i] = i
+    for j in range(0, i - 1):
+      if li[j].span_end < li[i].span_start and f[j] + li[i].score > f[i]:
+        f[i] = f[j] + li[i].score
+        g[i] = j
+    if f[i] > f[a]:
+      a = i
+
+  res = []
+
+  def put(a):
+    if a == g[a]:
+      res.append(li[a])
+      return
+    put(g[a])
+    res.append(li[a])
+
+  put(a)
+
+  for i in range(len(res)):
+    print(res[i].span_start, res[i].span_end)
+
+  return res
 class ScoreSummary(object):
 
   def __init__(self):
@@ -113,9 +170,17 @@ def compute_predictions(example):
 
     #将合格预测添加至总预测表中
     total_prediction_record_list.extend(qualified_prediction_list)
+  # 去重
+  #unrepeated_prediction_list = total_prediction_record_list
+  unrepeated_prediction_list = eliminate_overlap(total_prediction_record_list)
+  
   # get sort 排序
-  sorted_prediction_list = sorted(total_prediction_record_list,key = get_score ,reverse=True)
-    
+  sorted_prediction_list = sorted(unrepeated_prediction_list,key = get_score ,reverse=True)
+  # get best
+  score = 0
+  if(len(sorted_prediction_list)>0):
+    best_prediction = sorted_prediction_list[0]
+    score = best_prediction.score
   
   def get_short_answers_output(prediction_record_list):
     # 这个用以获取输出结果
@@ -140,14 +205,14 @@ def compute_predictions(example):
   summary.predicted_label = {
       "example_id": example.example_id,
       "long_answer": {
-          "start_token": 0,
-          "end_token": 0,
+          "start_token": -1,
+          "end_token": -1,
           "start_byte": -1,
           "end_byte": -1,
       },
       "long_answer_score": 0,
       "short_answers": get_short_answers_output(sorted_prediction_list),
-      "short_answers_score": 0,
+      "short_answers_score": score,
       "yes_no_answer": "NONE"
   }
 
