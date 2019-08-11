@@ -46,7 +46,7 @@ if operation == "predict":
     print(command)
     os.system(command)
     # eval
-    command = "python -m nq_eval \
+    command = "python -m nq_eval_new \
     --logtostderr \
     --gold_path={} \
     --predictions_path=./prediction/nq-dev-sample.prediction.json".format(predict_file_path)
