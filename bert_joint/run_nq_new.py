@@ -1281,8 +1281,7 @@ def input_fn_builder(input_file, seq_length, is_training, drop_remainder):
       "unique_ids": tf.FixedLenFeature([], tf.int64),
       "input_ids": tf.FixedLenFeature([seq_length], tf.int64),
       "input_mask": tf.FixedLenFeature([seq_length], tf.int64),
-      "segment_ids": tf.FixedLenFeature([seq_length], tf.int64),
-      
+      "segment_ids": tf.FixedLenFeature([seq_length], tf.int64),   
   }
   
   name_to_features["mask_positions"] = tf.FixedLenFeature([seq_length], tf.int64)
@@ -1324,6 +1323,10 @@ def input_fn_builder(input_file, seq_length, is_training, drop_remainder):
     return d
 
   return input_fn
+
+# 用于多答案预测
+def predict_input_fn_builder(examples, seq_length, is_training, drop_remainder):
+  def
 
 
 RawResult = collections.namedtuple(
