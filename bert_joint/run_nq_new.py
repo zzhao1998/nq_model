@@ -1,4 +1,4 @@
-# coding=utf-8
+﻿# coding=utf-8
 # Copyright 2018 The Google AI Language Team Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -1326,7 +1326,7 @@ def input_fn_builder(input_file, seq_length, is_training, drop_remainder):
 
 # 用于多答案预测
 def predict_input_fn_builder(examples, seq_length, is_training, drop_remainder):
-  def
+  pass
 
 
 RawResult = collections.namedtuple(
