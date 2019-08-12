@@ -1153,7 +1153,7 @@ def read_nq_examples(input_file, is_training):
   input_paths = tf.gfile.Glob(input_file)
 
   print("path----------------------------------------")
-  print(input_path)
+  print(input_paths)
   input_data = []
 
   def _open(path):

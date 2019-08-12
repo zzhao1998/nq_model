@@ -24,7 +24,7 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_string("predict_mode", "basic", "the type of predicting method")
 
-flags.DEFINE_best("num_best", 0, "the num of output prediction") #如果等于0,则不限制数量，否则，保留这些
+flags.DEFINE_integer("num_best", 0, "the num of output prediction") #如果等于0,则不限制数量，否则，保留这些
 
 
 """

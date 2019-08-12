@@ -28,16 +28,16 @@ train_combination_tfrecord_path = "/home/zhangzihao/nq_model/bert_joint/data/com
 bert_base_path ="/home/zhangzihao/nq_model/bert_joint/bert_base/bert_model.ckpt"
 
 
-no_combination_loss_basic_model_path="/home/zhangzihao/nq_model/bert_joint/bert_model_output/model_no_combination_loss_basic_epoch2/model.ckpt-125998"
+no_combination_loss_basic_model_path="/home/zhangzihao/nq_model/bert_joint/bert_model_output/model_no_combination_loss_basic_epoch1/model.ckpt-14174"
 no_combination_loss_advance_model_path ="/home/zhangzihao/nq_model/bert_joint/bert_model_output/model_no_combination_loss_hinge_epoch1/model.ckpt-71089"
 
 
 if operation == "predict":
 
-    predict_file_path = dev_sample_path
+    predict_file_path = test_sample_path
     # predict
-    #model_dir = no_combination_loss_basic_model_path
-    model_dir = "bert_model_output/model_no_combination_loss_hinge_margin_0.4_epoch1/model.ckpt-21402"
+    model_dir = no_combination_loss_basic_model_path
+    #model_dir = "bert_model_output/model_no_combination_loss_hinge_margin_0.4_epoch1/model.ckpt-21402"
     command = "CUDA_VISIBLE_DEVICES={} python2 -m run_nq_new \
     --logtostderr \
     --bert_config_file=bert_config.json \
@@ -53,6 +53,9 @@ if operation == "predict":
     
     print(command)
     os.system(command)
+
+
+    """
     # eval
     command = "python -m nq_eval_new \
     --logtostderr \
@@ -60,7 +63,7 @@ if operation == "predict":
     --predictions_path=./prediction/nq-dev-sample.prediction.json".format(predict_file_path)
     print(command)
     os.system(command)
-
+    """
 
 
 

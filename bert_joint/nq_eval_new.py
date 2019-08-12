@@ -236,9 +236,9 @@ def score_short_answer(gold_label_list, pred_label):
         #                        pred_label.short_answer_span_list):
         #   is_correct = True
         #   break
-        gold_set = IntervalSet([(span.start_token_idx, span.end_token_idx) \
+        gold_set = IntervalSet([Interval(span.start_token_idx, span.end_token_idx) \
                                 for span in gold_label.short_answer_span_list])
-        pred_set = IntervalSet([(span.start_token_idx, span.end_token_idx) \
+        pred_set = IntervalSet([Interval(span.start_token_idx, span.end_token_idx) \
                                 for span in pred_label.short_answer_span_list])
         overlap_set = gold_set & pred_set
 
@@ -407,7 +407,7 @@ def compute_pr_curves(answer_stats, targets=None):
       total_r += r
 
     scores_to_stats[score] = [total_f1 / cnt, total_p / cnt, total_r / cnt]
-  print(scores_to_stats)
+  # print(scores_to_stats)
   best_f1 = 0.0
   best_precision = 0.0
   best_recall = 0.0
@@ -507,8 +507,8 @@ def main(_):
 
   nq_pred_dict = util.read_prediction_json(FLAGS.predictions_path)
 
-  print("nq_gold_dict", nq_gold_dict)
-  print("nq_pred_dict", nq_pred_dict)
+  # print("nq_gold_dict", nq_gold_dict)
+  # print("nq_pred_dict", nq_pred_dict)
   long_answer_stats, short_answer_stats = score_answers(nq_gold_dict,
                                                         nq_pred_dict)
 
