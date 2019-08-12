@@ -24,6 +24,9 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_string("predict_mode", "basic", "the type of predicting method")
 
+flags.DEFINE_best("num_best", 0, "the num of output prediction") #如果等于0,则不限制数量，否则，保留这些
+
+
 """
 class InputFeatures(object):
   def __init__(self,
@@ -153,7 +156,7 @@ def compute_predictions(example):
     
     prediction_list=get_prediction(start_logits,end_logits,answer_type_logits,max_answer_length,token_map,mode = FLAGS.predict_mode)
     
-    # get best prediction
+    
     def get_score(prediction_record):
       return prediction_record.score
     # get all score > 0
@@ -163,7 +166,8 @@ def compute_predictions(example):
         if(prediction_record.score>0):
           ret.append(prediction_record)
       return ret
-    
+    # get_best_prediction
+
     #所有score>0均为合格预测
 
     qualified_prediction_list = filter(prediction_list)
@@ -176,6 +180,16 @@ def compute_predictions(example):
   
   # get sort 排序
   sorted_prediction_list = sorted(unrepeated_prediction_list,key = get_score ,reverse=True)
+
+  def get_best_n_prediction(sorted_prediction_list,num_best):
+    if len(sorted_prediction_list)>n_best:
+      return sorted_prediction_list[0:n_best]
+    else:
+      return sorted_prediction_list
+
+  
+  if(FLAGS.num_best > 0):
+    sorted_prediction_list = get_best_n_prediction(sorted_prediction_list,FLAGS.num_best)
   # get best
   score = 0
   if(len(sorted_prediction_list)>0):
