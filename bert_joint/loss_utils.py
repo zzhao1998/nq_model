@@ -15,7 +15,7 @@ answer_type_len = 5
 def compute_loss(start_logits,end_logits,answer_type_logits,start_positions,end_positions,answer_type_positions,mode):
     if(mode == "basic"):
         return compute_loss_basic(start_logits,end_logits,answer_type_logits,start_positions,end_positions,answer_type_positions)
-    if(mode == "advance"):
+    if(mode == "hinge"):
         return compute_loss_advance(start_logits,end_logits,answer_type_logits,start_positions,end_positions,answer_type_positions)
 
     return compute_loss_basic(start_logits,end_logits,answer_type_logits,start_positions,end_positions,answer_type_positions)

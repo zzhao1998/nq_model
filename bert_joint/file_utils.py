@@ -47,7 +47,9 @@ def read_dir(dir_path):
 def read_train_data(train_data_path,num_count):
     if os.path.isdir(train_data_path):
         print("read train data from folder: %s"%(train_data_path))
-        return read_dir(train_data_path)
+        ret = read_dir(train_data_path)
+        print(ret)
+        return ret
     elif os.path.isfile(train_data_path):
         print("read train data file:%s"%(train_data_path))
         return [train_data_path,num_count],num_count

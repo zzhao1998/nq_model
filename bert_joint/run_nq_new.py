@@ -1151,6 +1151,9 @@ class InputFeatures(object):
 def read_nq_examples(input_file, is_training):
   """Read a NQ json file into a list of NqExample."""
   input_paths = tf.gfile.Glob(input_file)
+
+  print("path----------------------------------------")
+  print(input_path)
   input_data = []
 
   def _open(path):
@@ -1158,7 +1161,7 @@ def read_nq_examples(input_file, is_training):
       return gzip.GzipFile(fileobj=tf.gfile.Open(path, "r"))
     else:
       return tf.gfile.Open(path, "r")
-
+  
   for path in input_paths:
     tf.logging.info("Reading: %s", path)
     with _open(path) as input_file:
