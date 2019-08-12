@@ -3,7 +3,10 @@
 
 # loss function
 import tensorflow as tf
+flags = tf.flags
+FLAGS = flags.FLAGS
 
+flags.DEFINE_float("marigin",0.4,"CLS_p 和正确答案和错误答案的距离")
 
 answer_type_len = 5
 # 标准的start/end position loss的计算方式
@@ -59,7 +62,7 @@ def compute_label_loss(logits, labels):
 
 def compute_position_extra_loss(logits,one_hot_positions):
     # 归一化处理
-    logits = tf.nn.log_softmax(logits)
+    #logits = tf.nn.log_softmax(logits)
 
 
     CLS_p = logits[:,0]
@@ -68,21 +71,39 @@ def compute_position_extra_loss(logits,one_hot_positions):
     seq_length = logits.shape[1]
     #print(CLS_p.shape)
     CLS_p = tf.reshape(CLS_p,[-1,1])
-    CLS_p = tf.tile(CLS_p,[1,seq_length-1])
+    CLS_p = tf.tile(CLS_p,[1,seq_length-1])#扩展
 
     onehot_positions = tf.cast(one_hot_positions,dtype=tf.float32)
-    positive_logits = (logits * onehot_positions)[:,1:]
-    negative_logits = (logits[:,1:]-positive_logits)
-    #print(positive_logits.shape) 
-    #print(negative_logits.shape)
+    #positive_logits = (logits * onehot_positions)[:,1:]
+    #negative_logits = (logits[:,1:]-positive_logits)
 
     # hinge loss
-    margin = 0.4 
+    margin = FLAGS.margin
+    
+    # 8.12 update: 这里需要考虑没有答案的情况，这时候positive_logits应该为全0 这时候不计算positive_loss
+    # 同时这里需要考虑另一个问题 就是如果positive_logits对应的每一个值都是负数怎么办
+
+    #判断是否有答案吗，如果无答案，不考虑positive loss
+    has_answers = tf.reduce_max(onehot_positions[:,1:],axis = -1)  #[batch_size]每一个表示这个是否有答案
+    
+    positive_inf = 100
+    negative_inf = -100
+    ones = tf.ones([batch_size,seq_length-1],dtype = tf.float32)
+    negative_ones = ones - onehot_positions[:,1:]
+    positive_ones = onehot_positions[:,1:]
+
+    behind_logits = logits[:,1:] #对应的是除去CLS的logits
+    positive_logits = behind_logits * positive_logits + positive_inf * negative_logits
+    negative_logits = behind_logits * negative_logits + negative_inf * positive_logits
+    #这里还需要干另外一件事情
+    #对于positive logits 其中只有onehot_positions对应的值是非0的，而其他是全为0的，为了避免0项对我们产生影响，我们最好给他们设一个极大的值
+    #同理对于negative logits 我们应该正例占有的位置设置一个极小的值
+
     #positive
-    # CLS_P + margin < positive_logits
+    # CLS_P + margin < positive_logits 找到最小的positive logits
     positive_H = tf.reduce_max(margin+CLS_p - positive_logits,axis = -1) # 找到小于CLS+margin 最多处的positive_logits 
     positive_L = tf.nn.relu(positive_H)
-    positive_loss =  tf.reduce_mean(positive_L) 
+    positive_loss =  tf.reduce_sum(positive_L*has_answers) /tf.reduce_sum(has_answers)
     #negative
     # CLS_P - margin > negative_logits
     negative_H = tf.reduce_max(negative_logits+margin-CLS_p,axis = -1)
