@@ -62,7 +62,7 @@ def compute_label_loss(logits, labels):
 
 def compute_position_extra_loss(logits,one_hot_positions):
     # 归一化处理
-    #logits = tf.nn.log_softmax(logits)
+    logits = tf.nn.log_softmax(logits)
 
 
     CLS_p = logits[:,0]
@@ -86,15 +86,15 @@ def compute_position_extra_loss(logits,one_hot_positions):
     #判断是否有答案吗，如果无答案，不考虑positive loss
     has_answers = tf.reduce_max(onehot_positions[:,1:],axis = -1)  #[batch_size]每一个表示这个是否有答案
     
-    positive_inf = 100
-    negative_inf = -100
+    positive_inf = CLS_P + margin
+    negative_inf = CLS_p - margin
     ones = tf.ones([batch_size,seq_length-1],dtype = tf.float32)
     negative_ones = ones - onehot_positions[:,1:]
     positive_ones = onehot_positions[:,1:]
 
     behind_logits = logits[:,1:] #对应的是除去CLS的logits
-    positive_logits = behind_logits * positive_logits + positive_inf * negative_logits
-    negative_logits = behind_logits * negative_logits + negative_inf * positive_logits
+    positive_logits = behind_logits * positive_ones + positive_inf * negative_ones
+    negative_logits = behind_logits * negative_ones + negative_inf * positive_ones
     #这里还需要干另外一件事情
     #对于positive logits 其中只有onehot_positions对应的值是非0的，而其他是全为0的，为了避免0项对我们产生影响，我们最好给他们设一个极大的值
     #同理对于negative logits 我们应该正例占有的位置设置一个极小的值

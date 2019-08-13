@@ -182,8 +182,8 @@ def compute_predictions(example):
   sorted_prediction_list = sorted(unrepeated_prediction_list,key = get_score ,reverse=True)
 
   def get_best_n_prediction(sorted_prediction_list,num_best):
-    if len(sorted_prediction_list)>n_best:
-      return sorted_prediction_list[0:n_best]
+    if len(sorted_prediction_list)>num_best:
+      return sorted_prediction_list[0:num_best]
     else:
       return sorted_prediction_list
 
