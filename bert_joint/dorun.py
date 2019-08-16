@@ -80,10 +80,10 @@ if operation == "predict":
 
 
 if operation == "train":
-    loss_mode = raw_input('please input loss_mode: ')
+    train_mode = raw_input('please input train_mode: ')
     train_tfrecord_path = train_no_combination_tfrecord_path
     #init_checkpoint = "bert_model_output/model_no_combination_loss_basic_epoch1/model.ckpt-71089"
-    if loss_mode == "basic":
+    if train_mode == "basic":
         init_checkpoint = bert_base_path
         output_dir = "bert_model_output/model_no_combination_loss_basic_epoch1"
         
@@ -106,7 +106,7 @@ if operation == "train":
 
         print(command)
         os.system(command)
-    if loss_mode== "advance":
+    if train_mode== "advance":
         init_checkpoint = bert_base_path
         output_dir = "bert_model_output/model_no_combination_loss_hinge_marigin_0.4_epoch2"
         
@@ -132,9 +132,17 @@ if operation == "train":
         print(command)
         os.system(command)
 
-    if loss_mode== "cross":
-        init_checkpoint = no_combination_loss_basic_model_path
-        output_dir = "bert_model_output/model_no_combination_loss_hinge_cross_epoch1"
+
+
+    #用于先预训练 然后再进行特殊loss的训练
+    if train_mode== "pretrained":
+        
+        # 已经训练了一个周期的
+        init_checkpoint ="/home/zhangzihao/nq_model/bert_joint/bert_model_output/model_no_combination_loss_basic_epoch1-2/model.ckpt-64116"
+        loss_mode = raw_input('please input loss_mode(basic/max_no_answer/hinge): ')
+
+
+        output_dir = "bert_model_output/model_pretrained_loss_"+loss_mode+"_epoch1"
         
         command = "CUDA_VISIBLE_DEVICES={} python2 -m run_nq_new \
         --logtostderr \
@@ -151,8 +159,8 @@ if operation == "train":
         --do_train \
         --output_dir={} \
         --model_mode='basic' \
-        --loss_mode='advance' \
-        --margin=0.4".format(gpu_id,train_tfrecord_path,init_checkpoint,output_dir)
+        --loss_mode={} \
+        --margin=0.4".format(gpu_id,train_tfrecord_path,init_checkpoint,output_dir,loss_mode)
 
 
         print(command)
