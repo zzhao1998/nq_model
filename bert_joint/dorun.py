@@ -31,16 +31,17 @@ bert_base_path ="/home/zhangzihao/nq_model/bert_joint/bert_base/bert_model.ckpt"
 no_combination_loss_basic_model_path="/home/zhangzihao/nq_model/bert_joint/bert_model_output/model_no_combination_loss_basic_epoch1/model.ckpt-128231"
 no_combination_loss_advance_model_path ="/home/zhangzihao/nq_model/bert_joint/bert_model_output/model_no_combination_loss_advance_marigin_0.4_epoch1/model.ckpt-128231"
 no_combination_loss_cross_model_path ="/home/zhangzihao/nq_model/bert_joint/bert_model_output/model_no_combination_loss_cross/model.ckpt-64116"
-
-wrong_model="/home/zhangzihao/nq_model/bert_joint/bert_model_output/model_no_combination_loss_hinge_margin_0.4_epoch1/model.ckpt-21402"
+bert_model_output_dir = "/home/zhangzihao/nq_model/bert_joint/bert_model_output/"
+hinge_cross = bert_model_output_dir+"model_no_combination_loss_hinge_cross_epoch1/model.ckpt-21402"
+wrong_model="/home/zhangzihao/nq_model/bert_joint/bert_model_output/model_no_combination_loss_hinge_margin_0.4_epoch1/model.ckpt-35687"
 
 if operation == "predict":
 
     predict_file_path = dev_sample_path
 
-    predict_mode ='basic'
+    predict_mode ='by_start'
     # predict
-    output_prediction_file ="prediction/wrong21402-{}.json".format(predict_mode)
+    output_prediction_file ="prediction/cross35687-{}.json".format(predict_mode)
 
     #model_dir = no_combination_loss_basic_model_path
     model_dir = wrong_model
