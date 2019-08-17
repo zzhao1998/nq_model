@@ -38,14 +38,16 @@ wrong_model="/home/zhangzihao/nq_model/bert_joint/bert_model_output/model_no_com
 if operation == "predict":
 
     predict_file_path = dev_sample_path
-
+    
+    loss_mode = raw_input('please input loss_mode(basic/max_no_answer/hinge): ')
+    margin = input('please input margin:')
     predict_mode ='by_start'
     # predict
-    output_prediction_file ="prediction/cross35687-{}.json".format(predict_mode)
+    output_prediction_file ="prediction/pretrained_dev/{}_epoch1_{}.json".format(loss_mode,predict_mode)
 
     #model_dir = no_combination_loss_basic_model_path
-    model_dir = wrong_model
-    #model_dir = "bert_model_output/model_no_combination_loss_hinge_margin_0.4_epoch1/model.ckpt-21402"
+    model_dir = "bert_model_output/model_pretrained_loss_"+loss_mode+"_margin_"+str(margin)+"_epoch1"
+    #model_dir = "bert_model_output/model_no_combination_loss_hinge_margin_0.4_epoch1_wrong/model.ckpt-21402"
     
     
     command = "CUDA_VISIBLE_DEVICES={} python2 -m run_nq_new \
@@ -83,6 +85,8 @@ if operation == "train":
     train_mode = raw_input('please input train_mode: ')
     train_tfrecord_path = train_no_combination_tfrecord_path
     #init_checkpoint = "bert_model_output/model_no_combination_loss_basic_epoch1/model.ckpt-71089"
+
+    """
     if train_mode == "basic":
         init_checkpoint = bert_base_path
         output_dir = "bert_model_output/model_no_combination_loss_basic_epoch1"
@@ -133,7 +137,7 @@ if operation == "train":
         os.system(command)
 
 
-
+    """
     #用于先预训练 然后再进行特殊loss的训练
     if train_mode== "pretrained":
         
@@ -141,8 +145,8 @@ if operation == "train":
         init_checkpoint ="/home/zhangzihao/nq_model/bert_joint/bert_model_output/model_no_combination_loss_basic_epoch1-2/model.ckpt-64116"
         loss_mode = raw_input('please input loss_mode(basic/max_no_answer/hinge): ')
 
-
-        output_dir = "bert_model_output/model_pretrained_loss_"+loss_mode+"_epoch1"
+        margin = input('please input margin:')
+        output_dir = "bert_model_output/model_pretrained_loss_"+loss_mode+"_margin_"+str(margin)+"_epoch1"
         
         command = "CUDA_VISIBLE_DEVICES={} python2 -m run_nq_new \
         --logtostderr \
@@ -160,7 +164,7 @@ if operation == "train":
         --output_dir={} \
         --model_mode='basic' \
         --loss_mode={} \
-        --margin=0.4".format(gpu_id,train_tfrecord_path,init_checkpoint,output_dir,loss_mode)
+        --margin={}".format(gpu_id,train_tfrecord_path,init_checkpoint,output_dir,loss_mode,margin)
 
 
         print(command)

@@ -342,7 +342,7 @@ def get_prediction_by_start(start_logits,end_logits,answer_type_logits,max_answe
     if(token_map[i] == -1):
       continue
     if(start_logits[i]>CLS_p):
-      print(token_map[i])
+      #print(token_map[i])
       #进行选择最大的end
       end = -1
       end_p = -10000
