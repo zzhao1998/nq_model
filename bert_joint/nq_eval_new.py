@@ -12,11 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
-
-# author zzd
-# change evaluation method 2019 8 12
 r"""Official evaluation script for Natural Questions.
 
   https://ai.google.com/research/NaturalQuestions
@@ -110,16 +105,17 @@ from absl import logging
 import eval_utils as util
 
 flags.DEFINE_string(
-  'gold_path', None, 'Path to the gzip JSON data. For '
-                     'multiple files, should be a glob '
-                     'pattern (e.g. "/path/to/files-*"')
-flags.DEFINE_string('predictions_path', None, 'Path to prediction JSON.')
+  'gold_path', 'sample/gold.gz', 'Path to the gzip JSON data. For '
+                                 'multiple files, should be a glob '
+                                 'pattern (e.g. "/path/to/files-*"')
+flags.DEFINE_string('predictions_path', 'sample/pred.json', 'Path to prediction JSON.')
 flags.DEFINE_bool(
   'cache_gold_data', False,
   'Whether to cache gold data in Pickle format to speed up '
   'multiple evaluations.')
 flags.DEFINE_integer('num_threads', 10, 'Number of threads for reading.')
-flags.DEFINE_bool('pretty_print', False, 'Whether to pretty print output.')
+#flags.DEFINE_bool('pretty_print', True, 'Whether to pretty print output.')
+flags.DEFINE_bool('optimal_threshold', True, 'Whether to adjust threshold');
 
 FLAGS = flags.FLAGS
 
@@ -131,69 +127,11 @@ def safe_divide(x, y):
   else:
     return x / y
 
-
-def score_long_answer(gold_label_list, pred_label):
-  """Scores a long answer as correct or not.
-
-  1) First decide if there is a gold long answer with LONG_NO_NULL_THRESHOLD.
-  2) The prediction will get a match if:
-     a. There is a gold long answer.
-     b. The prediction span match exactly with *one* of the non-null gold
-        long answer span.
-
-  Args:
-    gold_label_list: A list of NQLabel, could be None.
-    pred_label: A single NQLabel, could be None.
-
-  Returns:
-    gold_has_answer, pred_has_answer, f1, score
-  """
-  gold_has_answer = util.gold_has_long_answer(gold_label_list)
-
-  pred_has_answer = pred_label and (
-    not pred_label.long_answer_span.is_null_span())
-
-  f1 = 0
-  p = 0
-  r = 0
-  score = pred_label.long_score
-
-  # Both sides are non-null spans.
-  if gold_has_answer and pred_has_answer:
-    for gold_label in gold_label_list:
-      # while the voting results indicate there is an long answer, each
-      # annotator might still say there is no long answer.
-      if gold_label.long_answer_span.is_null_span():
-        continue
-        # Span: start_token_idx, end_token_idx
-        # if util.nonnull_span_equal(gold_label.long_answer_span,
-        #                            pred_label.long_answer_span):
-
-        gold_span = gold_label.long_answer_span.start_token_idx, gold_label.long_answer_span.end_token_idx
-        pred_span = pred_label.long_answer_span.start_token_idx, pred_label.long_answer_span.end_token_idx
-
-        overlap_len = max(min(gold_span[1], pred_span[1]) - max(gold_span[0], pred_span[0]) + 1, 0)
-        precision = overlap_len / (pred_span[1] - pred_span[0] + 1)
-        recall = overlap_len / (gold_span[1] - gold_span[0] + 1)
-
-        if safe_divide(2 * precision * recall, precision + recall) > f1:
-          f1 = safe_divide(2 * precision * recall, precision + recall)
-          p = precision
-          r = recall
-
-  elif not gold_has_answer and not pred_has_answer:
-    f1 = 1
-    p = 1
-    r = 1
-
-  return gold_has_answer, pred_has_answer, f1, p, r, score
-
-
-def score_short_answer(gold_label_list, pred_label):
+def score_short_answer(gold_label_list, pred_label, threshold = 0):
   """Scores a short answer as correct or not.
 
   1) First decide if there is a gold short answer with SHORT_NO_NULL_THRESHOLD.
-  2) The prediction will get a match if:
+  2) The prediction will get a F1 if:
      a. There is a gold short answer.
      b. The prediction span *set* match exactly with *one* of the non-null gold
         short answer span *set*.
@@ -212,14 +150,15 @@ def score_short_answer(gold_label_list, pred_label):
 
   # There is a pred long answer if pred_label is not empty and short answer
   # set is not empty.
+
   pred_has_answer = pred_label and (
-          (not util.is_null_span_list(pred_label.short_answer_span_list)) or
+          (not util.is_null_span_list(pred_label.short_answer_span_list, pred_label.short_score_list, threshold)) or
           pred_label.yes_no_answer != 'none')
 
   f1 = 0
   p = 0
   r = 0
-  score = pred_label.short_score
+  # score = pred_label.short_score
 
   # Both sides have short answers, which contains yes/no questions.
   if gold_has_answer and pred_has_answer:
@@ -232,24 +171,25 @@ def score_short_answer(gold_label_list, pred_label):
           break
     else:
       for gold_label in gold_label_list:
-        # if util.span_set_equal(gold_label.short_answer_span_list,
-        #                        pred_label.short_answer_span_list):
-        #   is_correct = True
-        #   break
-        gold_set = IntervalSet([Interval(span.start_token_idx, span.end_token_idx) \
-                                for span in gold_label.short_answer_span_list])
-        pred_set = IntervalSet([Interval(span.start_token_idx, span.end_token_idx) \
-                                for span in pred_label.short_answer_span_list])
-        overlap_set = gold_set & pred_set
+        gold_set = []
+        pred_set = []
+        for span, score in zip(pred_label.short_answer_span_list, pred_label.short_score_list):
+          if score >= threshold:
+            pred_set += [(span.start_token_idx, span.end_token_idx)]
+        for span in gold_label.short_answer_span_list:
+          gold_set += [(span.start_token_idx, span.end_token_idx)]
 
-        def calc_len(interval_set):
+        def count_same(span_list, interval_set):
           sum = 0
-          for span in interval_set:
-            sum += span.upper_bound - span.lower_bound + 1
+          for span in span_list:
+            for interval in interval_set:
+              if span[0] == interval[0] and span[1] == interval[1]:
+                sum += 1
+                break
           return sum
-
-        precision = safe_divide(calc_len(overlap_set), calc_len(pred_set))
-        recall = safe_divide(calc_len(overlap_set), calc_len(gold_set))
+        correct_interval = count_same(pred_set, gold_set)
+        precision = safe_divide(correct_interval, len(pred_set))
+        recall = safe_divide(correct_interval, len(gold_set))
 
         if safe_divide(2 * precision * recall, precision + recall) > f1:
           f1 = safe_divide(2 * precision * recall, precision + recall)
@@ -260,237 +200,67 @@ def score_short_answer(gold_label_list, pred_label):
     p = 1
     r = 1
 
-  return gold_has_answer, pred_has_answer, f1, p, r, score
+  return gold_has_answer, pred_has_answer, f1, p, r
 
-
-def score_answers(gold_annotation_dict, pred_dict):
-  """Scores all answers for all documents.
-
-  Args:
-    gold_annotation_dict: a dict from example id to list of NQLabels.
-    pred_dict: a dict from example id to list of NQLabels.
-
-  Returns:
-    long_answer_stats: List of scores for long answers.
-    short_answer_stats: List of scores for short answers.
-  """
+def get_f1(gold_annotation_dict, pred_dict):
   gold_id_set = set(gold_annotation_dict.keys())
   pred_id_set = set(pred_dict.keys())
 
   if gold_id_set.symmetric_difference(pred_id_set):
+    print("gold_id_set", gold_id_set)
+    print("pred_id_set", pred_id_set)
     raise ValueError('ERROR: the example ids in gold annotations and example '
                      'ids in the prediction are not equal.')
 
-  long_answer_stats = []
-  short_answer_stats = []
+  final_f1 = 0
+  final_p = 0
+  final_r = 0
+  if FLAGS.optimal_threshold == True:
+    score_list = []
+    for example_id in gold_id_set:
+      gold = gold_annotation_dict[example_id]
+      pred = pred_dict[example_id]
+      for score in pred.short_score_list:
+        score_list += [score]
 
-  for example_id in gold_id_set:
-    gold = gold_annotation_dict[example_id]
-    pred = pred_dict[example_id]
+    score_list += [0]
+    score_list.sort()
+    #print('score_list', score_list)
+    for threshold in score_list:
+      sum_f1 = 0
+      sum_p = 0
+      sum_r = 0
+      for example_id in gold_id_set:
+        gold = gold_annotation_dict[example_id]
+        pred = pred_dict[example_id]
+        gold_has_answer, pred_has_answer, f1, p, r = score_short_answer(gold, pred, threshold)
+        # print('threshold, f1, gold_has_answer, pred_has_answer', \
+        #   threshold, f1, gold_has_answer, pred_has_answer)
+        sum_f1 += f1
+        sum_p += p
+        sum_r += r
+      # print('threshold, f1, p, r', \
+      #   threshold, safe_divide(sum_f1, len(gold_id_set)), safe_divide(sum_p, len(gold_id_set)), safe_divide(sum_r, len(gold_id_set)))
+      if safe_divide(sum_f1, len(gold_id_set)) > final_f1:
+        final_f1 = safe_divide(sum_f1, len(gold_id_set))
+        final_p = safe_divide(sum_p, len(gold_id_set))
+        final_r = safe_divide(sum_r, len(gold_id_set))
+  else:
+    sum_f1 = 0
+    sum_p = 0
+    sum_r = 0
+    for example_id in gold_id_set:
+      gold = gold_annotation_dict[example_id]
+      pred = pred_dict[example_id]
+      gold_has_answer, pred_has_answer, f1, p, r = score_short_answer(gold, pred)
+      sum_f1 += f1
+      sum_p += p
+      sum_r += r
+    final_f1 = safe_divide(sum_f1, len(gold_id_set))
+    final_p = safe_divide(sum_p, len(gold_id_set))
+    final_r = safe_divide(sum_r, len(gold_id_set))
 
-    long_answer_stats.append(score_long_answer(gold, pred))
-    short_answer_stats.append(score_short_answer(gold, pred))
-
-  # use the 'score' column, which is last
-  long_answer_stats.sort(key=lambda x: x[-1], reverse=True)
-  short_answer_stats.sort(key=lambda x: x[-1], reverse=True)
-
-  return long_answer_stats, short_answer_stats
-
-
-def compute_f1(answer_stats, prefix=''):
-  """Computes F1, precision, recall for a list of answer scores.
-
-  Args:
-    answer_stats: List of per-example scores.
-    prefix (''): Prefix to prepend to score dictionary.
-
-  Returns:
-    Dictionary mapping string names to scores.
-  """
-
-  # has_gold, has_pred, is_correct, _ = zip(*answer_stats)
-  # precision = safe_divide(sum(is_correct), sum(has_pred))
-  # recall = safe_divide(sum(is_correct), sum(has_gold))
-  # f1 = safe_divide(2 * precision * recall, precision + recall)
-
-  has_gold, has_pred, f1, p, r, _ = zip(*answer_stats)
-  f1_val = safe_divide(sum(f1), len(f1))
-  precision = safe_divide(sum(p), len(f1))
-  recall = safe_divide(sum(r), len(f1))
-
-  # return OrderedDict({
-  #   prefix + 'n': len(answer_stats),
-  #   prefix + 'f1': f1,
-  #   prefix + 'precision': precision,
-  #   prefix + 'recall': recall
-  # })
-  return OrderedDict({
-    prefix + 'n': len(answer_stats),
-    prefix + 'f1': f1_val,
-    prefix + 'precision': precision,
-    prefix + 'recall': recall
-  })
-
-
-def compute_final_f1(long_answer_stats, short_answer_stats):
-  """Computes overall F1 given long and short answers, ignoring scores.
-
-  Note: this assumes that the answers have been thresholded.
-
-  Arguments:
-     long_answer_stats: List of long answer scores.
-     short_answer_stats: List of short answer scores.
-
-  Returns:
-     Dictionary of name (string) -> score.
-  """
-  scores = compute_f1(long_answer_stats, prefix='long-answer-')
-  scores.update(compute_f1(short_answer_stats, prefix='short-answer-'))
-  return scores
-
-
-def compute_pr_curves(answer_stats, targets=None):
-  """Computes PR curve and returns R@P for specific targets.
-
-  The values are computed as follows: find the (precision, recall) point
-  with maximum recall and where precision > target.
-
-  Arguments:
-    answer_stats: List of statistic tuples from the answer scores.
-    targets (None): List of precision thresholds to target.
-
-  Returns:
-    List of table with rows: [target, r, p, score].
-  """
-  cnt = len(answer_stats)
-  total_f1 = 0
-  total_p = 0
-  total_r = 0
-
-  # Count the number of gold annotations.
-  # for has_gold, _, _, _ in answer_stats:
-  #   total_has_gold += has_gold
-  for has_gold, has_pred, f1, p, r, score in answer_stats:
-    if not has_gold:
-      total_f1 += 1
-      total_p += 1
-      total_r += 1
-
-  # Keep track of the point of maximum recall for each target.
-  max_recall = [0 for _ in targets]
-  max_precision = [0 for _ in targets]
-  max_scores = [None for _ in targets]
-
-  # Only keep track of unique thresholds in this dictionary.
-  scores_to_stats = OrderedDict()
-
-  # Loop through every possible threshold and compute precision + recall.
-  for has_gold, has_pred, f1, p, r, score in answer_stats:
-    # total_correct += is_correct
-    # total_has_pred += has_pred
-    #
-    # precision = safe_divide(total_correct, total_has_pred)
-    # recall = safe_divide(total_correct, total_has_gold)
-    #
-    # # If there are any ties, this will be updated multiple times until the
-    # # ties are all counted.
-    # scores_to_stats[score] = [precision, recall]
-
-    if not has_gold and has_pred:
-      total_f1 -= 1
-      total_p -= 1
-      total_r -= 1
-    elif has_pred:
-      total_f1 += f1
-      total_p += p
-      total_r += r
-
-    scores_to_stats[score] = [total_f1 / cnt, total_p / cnt, total_r / cnt]
-  # print(scores_to_stats)
-  best_f1 = 0.0
-  best_precision = 0.0
-  best_recall = 0.0
-  best_threshold = 0.0
-
-  for threshold, (f1, precision, recall) in scores_to_stats.iteritems():
-    # Match the thresholds to the find the closest precision above some target.
-    for t, target in enumerate(targets):
-      if precision >= target and recall > max_recall[t]:
-        max_recall[t] = recall
-        max_precision[t] = precision
-        max_scores[t] = threshold
-
-    # Compute optimal threshold.
-    f1 = safe_divide(2 * precision * recall, precision + recall)
-    if f1 > best_f1:
-      best_f1 = f1
-      best_precision = precision
-      best_recall = recall
-      best_threshold = threshold
-
-  return ((best_f1, best_precision, best_recall, best_threshold),
-          zip(targets, max_recall, max_precision, max_scores))
-
-
-def print_r_at_p_table(answer_stats):
-  """Pretty prints the R@P table for default targets."""
-  opt_result, pr_table = compute_pr_curves(
-    answer_stats, targets=[0.5, 0.75, 0.9])
-  f1, precision, recall, threshold = opt_result
-  print('Optimal threshold: {:.5}'.format(threshold))
-  print(' F1     /  P      /  R')
-  print('{: >7.2%} / {: >7.2%} / {: >7.2%}'.format(f1, precision, recall))
-  for target, recall, precision, row in pr_table:
-    print('R@P={}: {:.2%} (actual p={:.2%}, score threshold={:.4})'.format(
-      target, recall, precision, row))
-
-
-def get_metrics_as_dict(gold_path, prediction_path, num_threads=10):
-  """Library version of the end-to-end evaluation.
-
-  Arguments:
-    gold_path: Path to the gzip JSON data. For multiple files, should be a glob
-      pattern (e.g. "/path/to/files-*")
-    prediction_path: Path to the JSON prediction data.
-    num_threads (10): Number of threads to use when parsing multiple files.
-
-  Returns:
-    metrics: A dictionary mapping string names to metric scores.
-  """
-
-  nq_gold_dict = util.read_annotation(gold_path, n_threads=num_threads)
-  nq_pred_dict = util.read_prediction_json(prediction_path)
-  long_answer_stats, short_answer_stats = score_answers(nq_gold_dict,
-                                                        nq_pred_dict)
-
-  return get_metrics_with_answer_stats(long_answer_stats, short_answer_stats)
-
-
-def get_metrics_with_answer_stats(long_answer_stats, short_answer_stats):
-  """Generate metrics dict using long and short answer stats."""
-
-  def _get_metric_dict(answer_stats, prefix=''):
-    """Compute all metrics for a set of answer statistics."""
-    opt_result, pr_table = compute_pr_curves(
-      answer_stats, targets=[0.5, 0.75, 0.9])
-    f1, precision, recall, threshold = opt_result
-    metrics = OrderedDict({
-      'best-threshold-f1': f1,
-      'best-threshold-precision': precision,
-      'best-threshold-recall': recall,
-      'best-threshold': threshold,
-    })
-    for target, recall, precision, _ in pr_table:
-      metrics['recall-at-precision>={:.2}'.format(target)] = recall
-      metrics['precision-at-precision>={:.2}'.format(target)] = precision
-
-    # Add prefix before returning.
-    return dict([(prefix + k, v) for k, v in metrics.iteritems()])
-
-  metrics = _get_metric_dict(long_answer_stats, 'long-')
-  metrics.update(_get_metric_dict(short_answer_stats, 'short-'))
-  return metrics
+  return final_f1, final_p, final_r
 
 
 def main(_):
@@ -507,36 +277,12 @@ def main(_):
 
   nq_pred_dict = util.read_prediction_json(FLAGS.predictions_path)
 
-  # print("nq_gold_dict", nq_gold_dict)
-  # print("nq_pred_dict", nq_pred_dict)
-  long_answer_stats, short_answer_stats = score_answers(nq_gold_dict,
-                                                        nq_pred_dict)
+  ## input: nq_gold_dict, nq_pred_dict
+  ## output: long, short score (with optional optimal threshold)
 
-  if FLAGS.pretty_print:
-    print('*' * 20)
-    print('LONG ANSWER R@P TABLE:')
-    print_r_at_p_table(long_answer_stats)
-    print('*' * 20)
-    print('SHORT ANSWER R@P TABLE:')
-    print_r_at_p_table(short_answer_stats)
-
-    scores = compute_final_f1(long_answer_stats, short_answer_stats)
-    print('*' * 20)
-    print('METRICS IGNORING SCORES (n={}):'.format(scores['long-answer-n']))
-    print('              F1     /  P      /  R')
-    print('Long answer  {: >7.2%} / {: >7.2%} / {: >7.2%}'.format(
-      scores['long-answer-f1'], scores['long-answer-precision'],
-      scores['long-answer-recall']))
-    print('Short answer {: >7.2%} / {: >7.2%} / {: >7.2%}'.format(
-      scores['short-answer-f1'], scores['short-answer-precision'],
-      scores['short-answer-recall']))
-  else:
-    metrics = get_metrics_with_answer_stats(long_answer_stats,
-                                            short_answer_stats)
-    print(json.dumps(metrics))
-
+  print('final f1, final_p, final_r', get_f1(nq_gold_dict, nq_pred_dict))
 
 if __name__ == '__main__':
-  flags.mark_flag_as_required('gold_path')
-  flags.mark_flag_as_required('predictions_path')
+  # flags.mark_flag_as_required('gold_path')
+  # flags.mark_flag_as_required('predictions_path')
   app.run(main)

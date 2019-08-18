@@ -16,30 +16,47 @@ def compute_loss(start_logits,end_logits,answer_type_logits,start_positions,end_
     if(mode == "basic"):
         print("loss mode ------------------------------ basic")
         return compute_loss_basic(start_logits,end_logits,answer_type_logits,start_positions,end_positions,answer_type_positions)
+
+    if(mode == "advance"):
+        print("loss mode ------------------------------ advance")
+        return compute_loss_advance(start_logits,end_logits,answer_type_logits,start_positions,end_positions,answer_type_positions)
+    
     if(mode == "hinge"):
         print("loss mode ------------------------------ hinge")
         return compute_loss_hinge(start_logits,end_logits,answer_type_logits,start_positions,end_positions,answer_type_positions)
+    
     if(mode == "hinge_complete"):
         print("loss mode ------------------------------ hinge_complete")
         return compute_loss_hinge_complete(start_logits,end_logits,answer_type_logits,start_positions,end_positions,answer_type_positions)
+    
     if(mode == "max_no_answer"):
         print("loss mode ------------------------------ max_no_answer")
         return compute_max_no_answer(start_logits,end_logits,answer_type_logits,start_positions,end_positions,answer_type_positions)
+    
     if(mode=="max_no_answer_complete"):
         print("loss mode ------------------------------ max_no_answer_complete")
         return compute_max_no_answer_complete(start_logits,end_logits,answer_type_logits,start_positions,end_positions,answer_type_positions)
     if(mode=="combination"):
         return compute_combination_loss(start_logits,end_logits,answer_type_logits,start_positions,end_positions,answer_type_positions)
+    if(mode=="combination_complete"):
+        return compute_combination_complete_loss(start_logits,end_logits,answer_type_logits,start_positions,end_positions,answer_type_positions)
     if(mode=="old"):
         return compute_old_loss(start_logits,end_logits,answer_type_logits,start_positions,end_positions,answer_type_positions)
+
+# basic
 def compute_loss_basic(start_logits,end_logits,answer_type_logits,start_positions,end_positions,answer_type_positions):
     start_loss = compute_position_loss(start_logits, start_positions)
     end_loss = compute_position_loss(end_logits, end_positions)
     answer_type_loss = compute_label_loss(answer_type_logits, answer_type_positions)
     total_loss = (start_loss + end_loss + answer_type_loss) / 3.0
     return total_loss
-
-
+# advance
+def compute_loss_advance(start_logits,end_logits,answer_type_logits,start_positions,end_positions,answer_type_positions):
+    start_loss = compute_position_loss_advance(start_logits, start_positions)
+    end_loss = compute_position_loss_advance(end_logits, end_positions)
+    answer_type_loss = compute_label_loss(answer_type_logits, answer_type_positions)
+    total_loss = (start_loss + end_loss + answer_type_loss) / 3.0
+    return total_loss
 
 def compute_loss_hinge(start_logits,end_logits,answer_type_logits,start_positions,end_positions,answer_type_positions):
     # basic loss
@@ -98,7 +115,17 @@ def compute_combination_loss(start_logits,end_logits,answer_type_logits,start_po
     total_loss = (start_loss + end_loss + answer_type_loss + extra_start_loss +extra_end_loss) / 5.0
     return total_loss
 
+def compute_combination_complete_loss(start_logits,end_logits,answer_type_logits,start_positions,end_positions,answer_type_positions):
+    
+    # max no answer loss
+    extra_start_loss = compute_position_combination_loss(start_logits,start_positions)
+    extra_end_loss = compute_position_combination_loss(end_logits,end_positions)
 
+    total_loss = (extra_start_loss +extra_end_loss) / 2.0
+    return total_loss
+
+
+# old
 def compute_old_loss(start_logits,end_logits,answer_type_logits,start_positions,end_positions,answer_type_positions):
     # basic loss
     start_loss = compute_position_loss(start_logits, start_positions)
@@ -120,6 +147,21 @@ def compute_position_loss(logits, one_hot_positions):
         tf.reduce_sum(positions * log_probs, axis=-1))
     return loss
 
+def compute_position_loss_advance(logits, one_hot_positions):
+    #对positions做归一化处理
+    positions = tf.cast(one_hot_positions,dtype=tf.float32)
+    seq_length = positions.shape[1]
+
+    CLS_p_one = tf.one_hot([0],depth = seq_length,dtype =tf.float32)[0]
+    positions = positions + 0.5*CLS_p_one
+
+    positions_softmax = tf.nn.softmax(positions)
+
+
+    log_probs = tf.nn.log_softmax(logits, axis=-1)
+    loss = -tf.reduce_mean(
+        tf.reduce_sum(positions_softmax * log_probs, axis=-1))
+    return loss
 
 # label loss
 # logits  :  预测得到的的answer_type
