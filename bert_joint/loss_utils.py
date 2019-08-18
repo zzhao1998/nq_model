@@ -147,13 +147,14 @@ def compute_position_loss(logits, one_hot_positions):
         tf.reduce_sum(positions * log_probs, axis=-1))
     return loss
 
+
 def compute_position_loss_advance(logits, one_hot_positions):
     #对positions做归一化处理
     positions = tf.cast(one_hot_positions,dtype=tf.float32)
     seq_length = positions.shape[1]
 
     CLS_p_one = tf.one_hot([0],depth = seq_length,dtype =tf.float32)[0]
-    positions = positions + 0.5*CLS_p_one
+    positions = positions + FLAGS.margin*CLS_p_one
 
     positions_softmax = tf.nn.softmax(positions)
 
@@ -354,7 +355,7 @@ def compute_position_old_loss(logits,one_hot_positions):
     #print(negative_logits.shape)
 
     # hinge loss
-    margin = 0.4 
+    margin = FLAGS.margin
     #positive
     # CLS_P + margin < positive_logits
     positive_H = tf.reduce_max(margin+CLS_p - positive_logits,axis = -1) # 找到小于CLS+margin 最多处的positive_logits 
