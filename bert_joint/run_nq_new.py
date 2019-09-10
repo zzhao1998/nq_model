@@ -186,7 +186,7 @@ TextSpan = collections.namedtuple("TextSpan", "token_positions text")
 
 # 学长的建议是把一些比较接近的答案连接到一起
 # flags.DEFINE_bool("answer_concat",False,"whether concat the adjoining answers")
-flags.DEFINE_integer("answer_interval",2,"距离小于这个的短答案直接拼接为1个答案")
+flags.DEFINE_integer("answer_interval",0,"距离小于这个的短答案直接拼接为1个答案")
 
 flags.DEFINE_bool("ignore_long_answer",True,"把长答案也视为没有答案")#没做
 

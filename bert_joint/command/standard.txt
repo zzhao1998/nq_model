@@ -4,8 +4,8 @@ prepare_data:
 
 python -m prepare_nq_data \
   --logtostderr \
-  --input_jsonl '/home/data/dataset/NaturalQuestions/v1.0/train/nq-train-4[5-9].jsonl.gz' \
-  --output_tfrecord ./data/no_combination_record/nq-train-45-49.tfrecord \
+  --input_jsonl '/home/data/share/NaturalQuestions/v1.0/train/nq-train-4[0-4].jsonl.gz' \
+  --output_tfrecord ./data/train_tfrecord/nq-train-40-44.tfrecord \
   --max_seq_length=512 \
   --include_unknowns=0.02 \
   --vocab_file=data/vocab-nq.txt \
@@ -84,7 +84,7 @@ CUDA_VISIBLE_DEVICES=0 python2 -m run_nq \
   --output_dir=./bert_model_output_epoch1/ \
   --output_prediction_file=./prediction/multi_answers_nq-train-00.prediction.json
 
-python -m nq_eval \
+python -m nq_eval_new \
   --logtostderr \
-  --gold_path=./multi_answers_data/multi_answers_nq-train-00.jsonl \
-  --predictions_path=./prediction/multi_answers_nq-train-00.prediction.json
+  --gold_path=./data/multi_answers_sample.jsonl.gz \
+  --predictions_path=/home/zhangzihao/nq_model/bert_joint/prediction/pretrained_multi_answer/combination_margin_0.4_epoch1_min_length.json

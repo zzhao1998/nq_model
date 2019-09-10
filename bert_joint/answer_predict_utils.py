@@ -26,7 +26,7 @@ flags.DEFINE_string("predict_mode", "basic", "the type of predicting method")
 
 flags.DEFINE_integer("num_best", 0, "the num of output prediction") #如果等于0,则不限制数量，否则，保留这些
 
-
+flags.DEFINE_bool("is_best_paragraph", True, "choose best paragraph") #使用局部性性质 只选出最佳段落中的内容
 """
 class InputFeatures(object):
   def __init__(self,
@@ -180,7 +180,45 @@ def compute_predictions(example):
   
   # get sort 排序
   sorted_prediction_list = sorted(unrepeated_prediction_list,key = get_score ,reverse=True)
+  # 根据段落选取结果
+  def get_best_paragraph(prediction_list):
+    best_paragraph_score = 0
+    best_paragraph_prediction_list = []
+    best_paragraph_start = -1
+    best_paragraph_end = -1
+    #print("ccc")
+    #print(example.candidates)
+    for c in example.candidates:
+      paragraph_score = 0
+      paragraph_prediction_list = []
+      for prediction in prediction_list:
+        start = prediction.span_start
+        end = prediction.span_end
+        score = prediction.score
+        if c["top_level"] and c["start_token"] <= start and c["end_token"] >= end:
+          #long_span = Span(c["start_token"], c["end_token"])
+          #break
+          paragraph_prediction_list.append(prediction)
+          paragraph_score += score
+      
+      if(paragraph_score > best_paragraph_score):
+        best_paragraph_score = paragraph_score
+        best_paragraph_prediction_list = paragraph_prediction_list
+        best_paragraph_start = c["start_token"]
+        best_paragraph_end = c["end_token"]
 
+    return best_paragraph_prediction_list,best_paragraph_score,best_paragraph_start,best_paragraph_end
+
+  best_paragraph_start = -1
+  best_paragraph_end = -1
+  best_paragraph_score = -1
+  #print("aaa")
+  if(FLAGS.is_best_paragraph):
+    #只保留一个段落中的结果
+    #print("bbb")
+    sorted_prediction_list,best_paragraph_score,best_paragraph_start,best_paragraph_end = get_best_paragraph(sorted_prediction_list)
+  #sorted_prediction_list = []
+  
   def get_best_n_prediction(sorted_prediction_list,num_best):
     if len(sorted_prediction_list)>num_best:
       return sorted_prediction_list[0:num_best]
@@ -219,12 +257,12 @@ def compute_predictions(example):
   summary.predicted_label = {
       "example_id": example.example_id,
       "long_answer": {
-          "start_token": -1,
-          "end_token": -1,
+          "start_token": best_paragraph_start,
+          "end_token": best_paragraph_end,
           "start_byte": -1,
           "end_byte": -1,
       },
-      "long_answer_score": 0,
+      "long_answer_score": best_paragraph_score,
       "short_answers": get_short_answers_output(sorted_prediction_list),
       "short_answers_score": score,
       "yes_no_answer": "NONE"
@@ -239,6 +277,8 @@ def get_prediction(start_logits,end_logits,answer_type_logits,max_answer_length,
         return get_prediction_basic(start_logits,end_logits,answer_type_logits,max_answer_length,token_map)
     if (mode == "by_start"):
         return get_prediction_by_start(start_logits,end_logits,answer_type_logits,max_answer_length,token_map)
+    if (mode == "min_length"):
+        return get_prediction_min_length(start_logits,end_logits,answer_type_logits,max_answer_length,token_map)
     #else:
         #greedy
         #return get_prediction_basic(start_logits,end_logits,answer_type_logits,max_answer_length,token_map)
@@ -371,4 +411,45 @@ def get_prediction_by_start(start_logits,end_logits,answer_type_logits,max_answe
       prediction_record.answer_type_logits = answer_type_logits
       prediction_record_list.append(prediction_record)
       
+  return prediction_record_list
+
+
+
+def get_prediction_min_length(start_logits,end_logits,answer_type_logits,max_answer_length,token_map):
+  # 这个的核心在于根据start进行选取
+  # 尽可能让答案长度短
+  # 如果start>CLS_p则视为答案，选择max_Answer_length以内的最大的end作为答案的end
+  prediction_record_list=[]
+  length = len(start_logits)
+  CLS_p_start = start_logits[0]
+  CLS_p_end = end_logits[0]
+
+  for i in range(length):
+    start_index = i
+    if(token_map[i] == -1):
+      continue
+    if(True):#start_logits[i]>CLS_p_start):
+      
+      #进行选择所有的end 满足 end_logits[end]>cls_p
+      #这里可能会有重复的结果
+      for j in range(max_answer_length):
+        if(i+j>=length):
+          break
+        if(token_map[i+j] == -1):
+          continue
+        if(start_logits[i]+end_logits[i+j]>CLS_p_start + CLS_p_end):
+          
+          end_index = i+j
+
+          score = start_logits[start_index]+end_logits[end_index] - start_logits[0] - end_logits[0]
+          # construct prediction_record
+          prediction_record = PredictionRecord()
+          prediction_record.span_start = token_map[start_index]
+          prediction_record.span_end = token_map[end_index]+1
+          prediction_record.answerable_p = start_logits[start_index]+end_logits[end_index]
+          prediction_record.unanswerable_p = start_logits[0]+end_logits[0]
+          prediction_record.score = score
+          prediction_record.answer_type_logits = answer_type_logits
+          prediction_record_list.append(prediction_record)
+          break
   return prediction_record_list

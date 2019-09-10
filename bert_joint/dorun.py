@@ -21,7 +21,7 @@ valid_data_path=dataset_position+"train/nq-train-4[5-9].jsonl.gz"
 
 
 # tfrecord
-train_no_combination_tfrecord_path = "/home/zhangzihao/nq_model/bert_joint/data/no_combination_record_train" #这个是部分数据集00-44
+train_no_combination_tfrecord_path = "/home/zhangzihao/nq_model/bert_joint/data/train_tfrecord" #这个是部分数据集00-44
 train_combination_tfrecord_path = "/home/zhangzihao/nq_model/bert_joint/data/combination_record"
 
 
@@ -43,17 +43,16 @@ if operation == "predict":
     if(train_mode == "pretrained"):
 
         predict_file_path = multi_answer_sample_path
-        
+        #predict_file_path =test_sample_path
+
         loss_mode = raw_input('please input loss_mode(basic/max_no_answer/hinge/combination/old): ')
         margin = input('please input margin:')
         predict_mode ='by_start'
         # predict
         output_prediction_file ="prediction/pretrained_multi_answer/{}_margin_{}_epoch1_{}.json".format(loss_mode,margin,predict_mode)
 
-        model_dir = no_combination_loss_basic_model_path
-        #model_dir = "bert_model_output/model_pretrained_loss_"+loss_mode+"_margin_"+str(margin)+"_epoch1"
-        #model_dir = "bert_model_output/model_no_combination_loss_hinge_margin_0.4_epoch1_wrong/model.ckpt-21402"
-        
+        model_dir = "bert_model_output/model_pretrained_loss_"+loss_mode+"_margin_"+str(margin)+"_epoch1"
+        #model_dir = no_combination_loss_basic_model_path
         
         command = "CUDA_VISIBLE_DEVICES={} python2 -m run_nq_new \
         --logtostderr \
@@ -66,7 +65,7 @@ if operation == "predict":
         --model_mode='basic' \
         --loss_mode='advance' \
         --predict_mode={} \
-        --num_best=2 \
+        --num_best=0 \
         --output_prediction_file={}".format(gpu_id,predict_file_path,model_dir,predict_mode,output_prediction_file)
         
         print(command)
@@ -92,6 +91,48 @@ if operation == "predict":
         print(command)
         os.system(command)
 
+    
+    if(train_mode == "origin"):
+
+        predict_file_path = dev_sample_path
+        #predict_file_path =test_sample_path
+
+        loss_mode = raw_input('please input loss_mode(basic/max_no_answer/hinge/combination/old): ')
+        margin = input('please input margin:')
+        predict_mode ='by_start'
+        # predict
+        output_prediction_file ="prediction/pretrained_dev/origin_{}_margin_{}_epoch1_{}.json".format(loss_mode,margin,predict_mode)
+
+        model_dir = "bert_model_output/model_pretrained_loss_"+loss_mode+"_margin_"+str(margin)+"_epoch1"
+        #model_dir = no_combination_loss_basic_model_path
+        
+        command = "CUDA_VISIBLE_DEVICES={} python2 -m run_nq_new \
+        --logtostderr \
+        --bert_config_file=bert_config.json \
+        --vocab_file=./data/vocab-nq.txt \
+        --predict_file={} \
+        --init_checkpoint={} \
+        --do_predict \
+        --output_dir=./fun \
+        --model_mode='basic' \
+        --loss_mode='advance' \
+        --predict_mode={} \
+        --num_best=0 \
+        --output_prediction_file={}".format(gpu_id,predict_file_path,model_dir,predict_mode,output_prediction_file)
+        
+        print(command)
+        os.system(command)
+        
+        
+        
+        # origin nq_eval
+        command = "python -m nq_eval \
+        --logtostderr \
+        --gold_path={} \
+        --predictions_path={} ".format(predict_file_path,output_prediction_file)
+        print(command)
+        os.system(command)
+
         
     
 
@@ -104,7 +145,7 @@ if operation == "predict":
         margin = input('please input margin:')
         predict_mode ='by_start'
         # predict
-        output_prediction_file ="prediction/pretrained_dev/{}_epoch1_{}.json".format(loss_mode,predict_mode)
+        output_prediction_file ="prediction/pretrained_dev/start_{}_margin_{}_epoch1_{}.json".format(loss_mode,margin,predict_mode)
 
         #model_dir = no_combination_loss_basic_model_path
         model_dir = "bert_model_output/model_start_loss_"+loss_mode+"_margin_"+str(margin)+"_epoch1"
@@ -216,7 +257,7 @@ if operation == "train":
         loss_mode = raw_input('please input loss_mode(basic/max_no_answer/hinge): ')
 
         margin = input('please input margin:')
-        output_dir = "bert_model_output/model_start_loss_"+loss_mode+"_margin_"+str(margin)+"_epoch1"
+        output_dir = "bert_model_output_new/model_start_loss_"+loss_mode+"_margin_"+str(margin)+"_epoch1"
         
         command = "CUDA_VISIBLE_DEVICES={} python2 -m run_nq_new \
         --logtostderr \
@@ -243,11 +284,11 @@ if operation == "train":
     if train_mode== "pretrained":
         
         # 已经训练了一个周期的
-        init_checkpoint ="/home/zhangzihao/nq_model/bert_joint/bert_model_output/model_no_combination_loss_basic_epoch1-2/model.ckpt-64116"
+        init_checkpoint ="/home/zhangzihao/nq_model/bert_joint/bert_model_output_new/model_start_loss_basic_margin_0_epoch1/model.ckpt-64116"
         loss_mode = raw_input('please input loss_mode(basic/max_no_answer/hinge): ')
 
         margin = input('please input margin:')
-        output_dir = "bert_model_output/model_pretrained_loss_"+loss_mode+"_margin_"+str(margin)+"_epoch1"
+        output_dir = "bert_model_output_new/model_pretrained_loss_"+loss_mode+"_margin_"+str(margin)+"_epoch1"
         
         command = "CUDA_VISIBLE_DEVICES={} python2 -m run_nq_new \
         --logtostderr \

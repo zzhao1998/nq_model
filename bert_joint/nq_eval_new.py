@@ -115,7 +115,7 @@ flags.DEFINE_bool(
   'multiple evaluations.')
 flags.DEFINE_integer('num_threads', 10, 'Number of threads for reading.')
 #flags.DEFINE_bool('pretty_print', True, 'Whether to pretty print output.')
-flags.DEFINE_bool('optimal_threshold', True, 'Whether to adjust threshold');
+flags.DEFINE_bool('optimal_threshold', False, 'Whether to adjust threshold');
 
 FLAGS = flags.FLAGS
 
@@ -143,7 +143,8 @@ def score_short_answer(gold_label_list, pred_label, threshold = 0):
   Returns:
     gold_has_answer, pred_has_answer, f1, score
   """
-
+  #print(gold_label_list)
+  #print(pred_label)
   # There is a gold short answer if gold_label_list not empty and non null
   # answers is over the threshold (sum over annotators).
   gold_has_answer = util.gold_has_short_answer(gold_label_list)
@@ -170,6 +171,7 @@ def score_short_answer(gold_label_list, pred_label, threshold = 0):
           r = 1
           break
     else:
+      # 抽取式答案比对
       for gold_label in gold_label_list:
         gold_set = []
         pred_set = []
@@ -179,6 +181,36 @@ def score_short_answer(gold_label_list, pred_label, threshold = 0):
         for span in gold_label.short_answer_span_list:
           gold_set += [(span.start_token_idx, span.end_token_idx)]
 
+        # 这里对gold_Set 进行处理
+
+        #print(gold_set)
+
+        def concat_gold_set(gold_set):
+          
+          def takeFirst(elem):
+            return elem[0]
+          gold_set.sort(key=takeFirst)
+
+          new_set = []
+          current_start = gold_set[0][0]
+          current_end = gold_set[0][1]
+          for i in range(1,len(gold_set)):
+            start = gold_set[i][0]
+            end = gold_set[i][1]
+            if(start-current_end>5):
+              new_set.append([current_start,current_end])
+              current_end = end
+              current_start = start
+            else:
+              current_end = end
+        
+          new_set.append([current_start,current_end])
+          return new_set
+
+        gold_set = concat_gold_set(gold_set)
+        #print(pred_set)
+        #print(gold_set)
+        #print("-------------------------------------------")
         def count_same(span_list, interval_set):
           sum = 0
           for span in span_list:
@@ -207,8 +239,8 @@ def get_f1(gold_annotation_dict, pred_dict):
   pred_id_set = set(pred_dict.keys())
 
   if gold_id_set.symmetric_difference(pred_id_set):
-    print("gold_id_set", gold_id_set)
-    print("pred_id_set", pred_id_set)
+    #print("gold_id_set", gold_id_set)
+    #print("pred_id_set", pred_id_set)
     raise ValueError('ERROR: the example ids in gold annotations and example '
                      'ids in the prediction are not equal.')
 
@@ -233,6 +265,8 @@ def get_f1(gold_annotation_dict, pred_dict):
       for example_id in gold_id_set:
         gold = gold_annotation_dict[example_id]
         pred = pred_dict[example_id]
+        #print(pred)
+        #print(gold)
         gold_has_answer, pred_has_answer, f1, p, r = score_short_answer(gold, pred, threshold)
         # print('threshold, f1, gold_has_answer, pred_has_answer', \
         #   threshold, f1, gold_has_answer, pred_has_answer)
@@ -259,7 +293,10 @@ def get_f1(gold_annotation_dict, pred_dict):
     final_f1 = safe_divide(sum_f1, len(gold_id_set))
     final_p = safe_divide(sum_p, len(gold_id_set))
     final_r = safe_divide(sum_r, len(gold_id_set))
+  print(len(gold_id_set))
 
+  #final f1
+  #final_f1 = 2*safe_divide(final_p*final_r,final_p+final_r)
   return final_f1, final_p, final_r
 
 
