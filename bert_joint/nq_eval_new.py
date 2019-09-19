@@ -280,6 +280,7 @@ def get_f1(gold_annotation_dict, pred_dict):
         final_p = safe_divide(sum_p, len(gold_id_set))
         final_r = safe_divide(sum_r, len(gold_id_set))
   else:
+    # 标准模式
     sum_f1 = 0
     sum_p = 0
     sum_r = 0

@@ -1,4 +1,4 @@
-# coding=utf-8
+﻿# coding=utf-8
 import os
 
 
@@ -21,7 +21,7 @@ valid_data_path=dataset_position+"train/nq-train-4[5-9].jsonl.gz"
 
 
 # tfrecord
-train_no_combination_tfrecord_path = "/home/zhangzihao/nq_model/bert_joint/data/train_tfrecord" #这个是部分数据集00-44
+train_no_combination_tfrecord_path = "/home/zhangzihao/nq_model/bert_joint/data/no_combination_record_train" #这个是部分数据集00-44
 train_combination_tfrecord_path = "/home/zhangzihao/nq_model/bert_joint/data/combination_record"
 
 
